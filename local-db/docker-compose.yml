@@ -1,0 +1,18 @@
+
+services:
+  mysqldb:
+    container_name: finance_ezd_db
+    restart: always
+    platform: linux/amd64
+    build:
+      context: ./
+      dockerfile: ./Dockerfile.devdb
+    environment:
+      MYSQL_DATABASE: ezd_finance_db
+      MYSQL_USER: ezd
+      MYSQL_PASSWORD: password
+      MYSQL_ROOT_PASSWORD: password
+    volumes:
+      - ./finance_ezd_db_data:/var/lib/mysql
+    ports:
+      - 3306:3306

@@ -1,0 +1,12 @@
+FROM public.ecr.aws/docker/library/mysql:8.0.35-debian
+
+WORKDIR /var/www
+
+# COPY ./create-db.sql ./sql/create-db.sql 
+# RUN mv ./sql/create-db.sql ./sql/1_create-db.sql
+# RUN cp ./sql/1_create-db.sql /docker-entrypoint-initdb.d/
+
+# copy the changes instead if you want to update an existing database
+# with the most current schema.
+
+EXPOSE 3306
