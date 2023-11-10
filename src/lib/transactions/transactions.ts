@@ -1,7 +1,7 @@
 
 import path from 'path';
 import { Dirent } from 'fs';
-import { readdir, stat } from 'fs/promises';
+import { readdir } from 'fs/promises';
 
 import { DATA_DIR_PATH } from '../../constants';
 
@@ -33,30 +33,26 @@ export async function transactions() {
 async function parseCsvDataFile(filePath: string) {
   let csvReader: CsvReader;
   let rawRecord: unknown;
-  let recordIdx: number;
   let headers: MINT_TRANSACTION_HEADERS_ENUM[] | undefined;
 
   console.log(`Parsing csv data file: ${filePath}`);
   csvReader = getCsvReader(filePath);
-  recordIdx = 0;
+  rawRecord = await csvReader.read();
+  if(!validateMintHeaders(rawRecord)) {
+    console.error(rawRecord);
+    throw new Error('Invalid CSV transaction headers');
+  }
+  headers = rawRecord;
   while((rawRecord = await csvReader.read()) !== null) {
     let currRecord: string[];
+    let mintTxn: MintTransaction;
     if(!isStringArray(rawRecord)) {
       console.error(rawRecord);
       throw new Error(`Encountered record that isn't string[] type, found type: ${typeof rawRecord}`);
     }
     currRecord = rawRecord;
-    if(recordIdx++ === 0) {
-      if(!validateMintHeaders(currRecord)) {
-        console.error(currRecord);
-        throw new Error('Invalid CSV transaction headers');
-      }
-      headers = currRecord;
-    } else {
-      let mintTxn: MintTransaction;
-      mintTxn = parseMintRecord(currRecord);
-      console.log(mintTxn.date);
-    }
+    mintTxn = parseMintRecord(currRecord);
+    console.log(mintTxn.date);
   }
   console.log('headers');
   console.log(headers);
@@ -97,11 +93,15 @@ function parseMintRecord(rawRecord: string[]) {
   return MintTransaction.deserialize(rawMintTransaction);
 }
 
-function validateMintHeaders(record: unknown[]): record is MINT_TRANSACTION_HEADERS_ENUM[] {
+function validateMintHeaders(rawRecord: unknown): rawRecord is MINT_TRANSACTION_HEADERS_ENUM[] {
   let areHeadersValid: boolean;
 
+  if(!isStringArray(rawRecord)) {
+    return false;
+  }
+
   areHeadersValid = MINT_TRANSACTION_HEADERS.every((mintTransactionHeader, idx) => {
-    return mintTransactionHeader === record[idx];
+    return mintTransactionHeader === rawRecord[idx];
   });
 
   return areHeadersValid;
