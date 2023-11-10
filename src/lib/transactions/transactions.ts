@@ -5,92 +5,59 @@ import { readdir } from 'fs/promises';
 
 import { DATA_DIR_PATH } from '../../constants';
 
-import { CsvReader, getCsvReader } from '../csv/parse-csv';
+import { parseCsv } from '../csv/parse-csv';
 import { isStringArray } from '../../util/validate-primitives';
 import {
   MINT_TRANSACTION_HEADERS,
   MINT_TRANSACTION_HEADERS_ENUM,
   MintTransaction,
 } from '../../models/mint-transaction';
-import { dateUtils } from '../../util/date-utils';
-// import { zonedTimeToUtc } from 'date-fns-tz';
-// import { TimeZones } from '../../config/timezones';
+import { Timer } from '../../util/timer';
+import { getIntuitiveTimeString } from '../../util/print-util';
 
 export async function transactions() {
   let dataFilePaths: string[];
+  let recordCount: number;
+  let headers: MINT_TRANSACTION_HEADERS_ENUM[] | undefined;
+  recordCount = 0;
 
   dataFilePaths = await getDataFiles();
   dataFilePaths = dataFilePaths.filter(dataFilePath => {
     return path.extname(dataFilePath) === '.csv';
   });
-  for(let i = 0; i < dataFilePaths.length; ++i) {
-    let currDataFilePath: string;
-    currDataFilePath = dataFilePaths[i];
-    await parseCsvDataFile(currDataFilePath);
-  }
-}
 
-async function parseCsvDataFile(filePath: string) {
-  let csvReader: CsvReader;
-  let rawRecord: unknown;
-  let headers: MINT_TRANSACTION_HEADERS_ENUM[] | undefined;
-
-  console.log(`Parsing csv data file: ${filePath}`);
-  csvReader = getCsvReader(filePath);
-  rawRecord = await csvReader.read();
-  if(!validateMintHeaders(rawRecord)) {
-    console.error(rawRecord);
-    throw new Error('Invalid CSV transaction headers');
-  }
-  headers = rawRecord;
-  while((rawRecord = await csvReader.read()) !== null) {
+  const recordCb = (rawRecord: unknown, recordIdx: number) => {
     let currRecord: string[];
     let mintTxn: MintTransaction;
+    if(recordIdx === 0) {
+      if(!validateMintHeaders(rawRecord)) {
+        console.error(rawRecord);
+        throw new Error('Invalid CSV transaction headers');
+      }
+      headers = rawRecord;
+      return; // continue
+    }
+    recordCount++;
     if(!isStringArray(rawRecord)) {
       console.error(rawRecord);
       throw new Error(`Encountered record that isn't string[] type, found type: ${typeof rawRecord}`);
     }
     currRecord = rawRecord;
-    mintTxn = parseMintRecord(currRecord);
-    console.log(mintTxn.date);
-  }
-  console.log('headers');
-  console.log(headers);
-}
-
-function parseMintRecord(rawRecord: string[]) {
-  let date: Date,
-    description: string,
-    originalDescription: string,
-    amount: number,
-    transactionType: string,
-    category: string,
-    accountName: string,
-    labels: string,
-    notes: string
-  ;
-  date = dateUtils.parse(rawRecord[0], 'MM/dd/yyyy', new Date());
-  description = rawRecord[1];
-  originalDescription = rawRecord[2];
-  amount = +rawRecord[3];
-  transactionType = rawRecord[4];
-  category = rawRecord[5];
-  accountName = rawRecord[6];
-  labels = rawRecord[7];
-  notes = rawRecord[8];
-
-  const rawMintTransaction = {
-    date,
-    description,
-    originalDescription,
-    amount,
-    transactionType,
-    category,
-    accountName,
-    labels,
-    notes,
+    mintTxn = MintTransaction.deserialize(currRecord);
   };
-  return MintTransaction.deserialize(rawMintTransaction);
+
+  for(let i = 0; i < dataFilePaths.length; ++i) {
+    let currDataFilePath: string;
+    let parseTimer: Timer, parseMs: number;
+    currDataFilePath = dataFilePaths[i];
+    parseTimer = Timer.start();;
+    await parseCsv(currDataFilePath, recordCb);
+    parseMs = parseTimer.stop();
+    console.log(`Parse took: ${getIntuitiveTimeString(parseMs)}`);
+  }
+
+  console.log(headers);
+  console.log(`record count: ${recordCount}`);
 }
 
 function validateMintHeaders(rawRecord: unknown): rawRecord is MINT_TRANSACTION_HEADERS_ENUM[] {

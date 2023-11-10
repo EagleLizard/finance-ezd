@@ -4,6 +4,26 @@ import { createReadStream, ReadStream } from 'fs';
 import { parser as CsvParser, parse as csvParse } from 'csv';
 
 import { checkFile } from '../../util/files';
+import { isPromise } from 'util/types';
+
+export async function parseCsv(
+  csvPath: string,
+  recordCb: (record: unknown, idx: number) => void | Promise<void>
+) {
+  let parseCsvFn: AsyncGenerator, recordItr: IteratorResult<unknown>;
+  let recordIdx: number;
+  parseCsvFn = parseCsvGenerator(csvPath);
+
+  recordIdx = 0;
+
+  while(!(recordItr = await parseCsvFn.next()).done) {
+    let recordCbResult: unknown;
+    recordCbResult = recordCb(recordItr.value, recordIdx++);
+    if(isPromise(recordCbResult)) {
+      await recordCbResult;
+    }
+  }
+}
 
 export type CsvReader = {
   read: () => Promise<unknown | null>;

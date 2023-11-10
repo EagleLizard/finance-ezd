@@ -1,5 +1,7 @@
 
 import { z } from 'zod';
+import { isStringArray } from '../util/validate-primitives';
+import { dateUtils } from '../util/date-utils';
 
 /*
 [
@@ -75,6 +77,9 @@ export class MintTransaction implements MintTransactionType {
 
   static deserialize(rawTransaction: unknown): MintTransaction {
     let parsedTransaction: MintTransactionType;
+    if(isStringArray(rawTransaction)) {
+      rawTransaction = rawTransactionFromRecord(rawTransaction);
+    }
     parsedTransaction = MintTransactionSchmea.parse(rawTransaction);
     return new MintTransaction(
       parsedTransaction.date,
@@ -88,4 +93,40 @@ export class MintTransaction implements MintTransactionType {
       parsedTransaction.notes,
     );
   }
+}
+
+function rawTransactionFromRecord(rawRecord: string[]) {
+  let date: Date,
+    description: string,
+    originalDescription: string,
+    amount: number,
+    transactionType: string,
+    category: string,
+    accountName: string,
+    labels: string,
+    notes: string
+  ;
+  date = dateUtils.parse(rawRecord[0], 'MM/dd/yyyy', new Date());
+  description = rawRecord[1];
+  originalDescription = rawRecord[2];
+  amount = +rawRecord[3];
+  transactionType = rawRecord[4];
+  category = rawRecord[5];
+  accountName = rawRecord[6];
+  labels = rawRecord[7];
+  notes = rawRecord[8];
+
+  const rawMintTransaction = {
+    date,
+    description,
+    originalDescription,
+    amount,
+    transactionType,
+    category,
+    accountName,
+    labels,
+    notes,
+  };
+
+  return rawMintTransaction
 }
