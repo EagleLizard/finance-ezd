@@ -15,4 +15,4 @@ services:
     volumes:
       - ./finance_ezd_db_data:/var/lib/mysql
     ports:
-      - 3306:3306
+      - 3420:3306
