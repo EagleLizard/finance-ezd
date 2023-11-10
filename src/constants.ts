@@ -8,3 +8,5 @@ export const DATA_DIR_PATH = [
   BASE_DIR,
   DATA_DIRNAME,
 ].join(path.sep);
+
+export const DEFAULT_MYSQL_DB_PORT = 3420;
