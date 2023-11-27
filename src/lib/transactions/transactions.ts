@@ -40,10 +40,10 @@ export async function transactions() {
 
   const recordCb = async (rawRecord: unknown, recordIdx: number) => {
     let currRecord: string[];
-    let mintTxn: MintTransaction;
+    let txnRecord: MintTransaction;
 
     let mintCategory: MintCategoryDto;
-    let mintAccount: MintCategoryDto;
+    let mintAccount: MintAccountDto;
     let mintTransaction: MintTransactionDto;
 
     if(recordIdx === 0) {
@@ -60,37 +60,64 @@ export async function transactions() {
       throw new Error(`Encountered record that isn't string[] type, found type: ${typeof rawRecord}`);
     }
     currRecord = rawRecord;
-    mintTxn = MintTransaction.deserialize(currRecord);
+    txnRecord = MintTransaction.deserialize(currRecord);
 
     let categoryQuery = await mysqlDb.execute<RowDataPacket[]>(
       'SELECT CategoryID, Name FROM category c WHERE c.Name = ?', [
-        mintTxn.category,
+        txnRecord.category,
       ]
     );
 
     let accountQuery = await mysqlDb.execute<RowDataPacket[]>('SELECT AccountID, Name FROM account a WHERE a.Name = ?', [
-      mintTxn.accountName,
+      txnRecord.accountName,
     ]);
 
     if(accountQuery[0].length < 1) {
       let insertAccountQuery = await mysqlDb.execute('INSERT INTO account (Name) VALUE (?)', [
-        mintTxn.accountName,
+        txnRecord.accountName,
       ]);
       const insertResult = MysqlInsertResult.deserialize(insertAccountQuery[0]);
-      mintAccount = new MintAccountDto(insertResult.insertId, mintTxn.accountName);
+      mintAccount = new MintAccountDto(insertResult.insertId, txnRecord.accountName);
     } else {
       mintAccount = MintAccountDto.deserialize(accountQuery[0][0]);
     }
 
     if(categoryQuery[0].length < 1) {
       let insertCategoryQuery = await mysqlDb.execute('INSERT INTO category (Name) VALUES (?)', [
-        mintTxn.category,
+        txnRecord.category,
       ]);
       const insertResult = MysqlInsertResult.deserialize(insertCategoryQuery[0]);
-      mintCategory = new MintCategoryDto(insertResult.insertId, mintTxn.category);
+      mintCategory = new MintCategoryDto(insertResult.insertId, txnRecord.category);
     } else {
       mintCategory = MintCategoryDto.deserialize(categoryQuery[0][0]);
     }
+
+    /*
+      just assuming USD for everything right now because no currency
+      metadata is available
+    */
+    const currencyID = 1;
+
+    let insertTxnQuery = await mysqlDb.execute(`INSERT INTO transaction (
+      Date,
+      Description,
+      OriginalDescription,
+      Amount,
+      Labels,
+      CurrencyID,
+      CategoryID,
+      AccountID
+    ) VALUES (?,?,?,?,?,?,?,?)`, [
+      txnRecord.date,
+      txnRecord.description,
+      txnRecord.originalDescription,
+      txnRecord.amount,
+      txnRecord.labels,
+      currencyID,
+      mintCategory.CategoryID,
+      mintAccount.AccountID,
+    ])
+    
   };
 
 
