@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS `transaction` (
     Chosen based on reading several stack overflow posts. See: https://stackoverflow.com/a/628639
   */
   `Amount` DECIMAL(19,4) NOT NULL,
+  `TransactionType` ENUM('credit', 'debit') NOT NULL,
   `Labels` VARCHAR(300),
   `Notes` VARCHAR(300),
   `CurrencyID` BIGINT(20) UNSIGNED NOT NULL,

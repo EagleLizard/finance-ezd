@@ -14,9 +14,9 @@ import {
 } from '../../models/mint-transaction';
 import { Timer } from '../../util/timer';
 import { getIntuitiveTimeString } from '../../util/print-util';
-import { MysqlDb } from '../database/mysql-db';
+import { MysqlDb, QueryGenericType } from '../database/mysql-db';
 import { config } from '../../config/config';
-import { RowDataPacket } from 'mysql2';
+import { FieldPacket, RowDataPacket } from 'mysql2';
 import { MintCategoryDto } from '../../models/category-dto';
 import { MysqlInsertResult } from '../../models/mysql-insert-result';
 import { MintAccountDto } from '../../models/account-dto';
@@ -29,9 +29,12 @@ export async function transactions() {
 
   let mysqlDb: MysqlDb;
 
+  let duplicateTxnRecordCount: number;
+
   mysqlDb = await initDb();
 
   recordCount = 0;
+  duplicateTxnRecordCount = 0;
 
   dataFilePaths = await getDataFiles();
   dataFilePaths = dataFilePaths.filter(dataFilePath => {
@@ -98,26 +101,75 @@ export async function transactions() {
     */
     const currencyID = 1;
 
-    let insertTxnQuery = await mysqlDb.execute(`INSERT INTO transaction (
-      Date,
-      Description,
-      OriginalDescription,
-      Amount,
-      Labels,
-      CurrencyID,
-      CategoryID,
-      AccountID
-    ) VALUES (?,?,?,?,?,?,?,?)`, [
+    let txnExistsQuery = await mysqlDb.execute<RowDataPacket[]>(`SELECT
+      t.TransactionID,
+      t.Date,
+      t.Description,
+      t.OriginalDescription,
+      t.Amount,
+      t.TransactionType,
+      t.Labels,
+      t.Notes,
+      c.Name AS CategoryName,
+      a.Name as AccountName
+    FROM transaction t
+      INNER JOIN category AS c ON t.CategoryID = c.CategoryID
+      INNER JOIN account AS a ON t.AccountID = a.AccountID
+    WHERE (
+      Date = ?
+      AND Description = ?
+      AND OriginalDescription = ?
+      AND Amount = ?
+      AND TransactionType = ?
+      AND Labels = ?
+      AND Notes = ?
+      AND c.Name = ?
+      AND a.Name = ?
+    )`, [
       txnRecord.date,
       txnRecord.description,
       txnRecord.originalDescription,
       txnRecord.amount,
+      txnRecord.transactionType,
       txnRecord.labels,
-      currencyID,
-      mintCategory.CategoryID,
-      mintAccount.AccountID,
-    ])
-    
+      txnRecord.notes,
+      txnRecord.category,
+      txnRecord.accountName,
+    ]);
+
+    if(txnExistsQuery[0].length > 0) {
+      // console.log('Transaction exists');
+      // console.log(txnExistsQuery[0]);
+      duplicateTxnRecordCount++;
+    }
+
+    let insertTxnQuery: [QueryGenericType, FieldPacket[]];
+    if(txnExistsQuery[0].length < 1) {
+      insertTxnQuery  = await mysqlDb.execute(`INSERT INTO transaction (
+        Date,
+        Description,
+        OriginalDescription,
+        Amount,
+        TransactionType,
+        Labels,
+        Notes,
+        CurrencyID,
+        CategoryID,
+        AccountID
+      ) VALUES (?,?,?,?,?,?,?,?,?,?)`, [
+        txnRecord.date,
+        txnRecord.description,
+        txnRecord.originalDescription,
+        txnRecord.amount,
+        txnRecord.transactionType,
+        txnRecord.labels,
+        txnRecord.notes,
+        currencyID,
+        mintCategory.CategoryID,
+        mintAccount.AccountID,
+      ]);
+    }
+
   };
 
 
@@ -134,6 +186,7 @@ export async function transactions() {
   
   console.log(headers);
   console.log(`record count: ${recordCount}`);
+  console.log(`duplicate count: ${duplicateTxnRecordCount}`);
 
   await mysqlDb.$destroy();
 }

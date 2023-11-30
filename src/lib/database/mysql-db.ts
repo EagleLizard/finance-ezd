@@ -9,7 +9,7 @@ type MysqlDbOpts = {
   port?: number;
 }
 
-type QueryGenericType = mysql2.OkPacket | mysql2.RowDataPacket[] | mysql2.ResultSetHeader[] | mysql2.RowDataPacket[][] | mysql2.OkPacket[] | mysql2.ProcedureCallPacket;
+export type QueryGenericType = mysql2.OkPacket | mysql2.RowDataPacket[] | mysql2.ResultSetHeader[] | mysql2.RowDataPacket[][] | mysql2.OkPacket[] | mysql2.ProcedureCallPacket;
 
 export class MysqlDb {
   private constructor(
